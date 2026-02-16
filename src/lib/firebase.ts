@@ -12,6 +12,20 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
 
+// Validate that required config is present
+const requiredKeys: (keyof typeof firebaseConfig)[] = ['apiKey', 'authDomain', 'projectId', 'appId'];
+const missingKeys = requiredKeys.filter(key => !firebaseConfig[key]);
+
+if (missingKeys.length > 0) {
+  console.error(
+    'Firebase config incomplete. Missing environment variables:',
+    missingKeys.map(key => `VITE_FIREBASE_${key.toUpperCase()}`).join(', ')
+  );
+  if (typeof window !== 'undefined') {
+    console.error('Please add environment variables to your Vercel project settings or .env.local for local development');
+  }
+}
+
 const app = initializeApp(firebaseConfig);
 
 export const auth = getAuth(app);
