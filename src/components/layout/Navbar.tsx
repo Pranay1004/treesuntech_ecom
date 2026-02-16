@@ -39,6 +39,20 @@ export default function Navbar() {
   const navigate = useNavigate();
   const { totalItems } = useCart();
   const { user, isAdminUser, logout } = useAuth();
+  const [isDevAdmin, setIsDevAdmin] = useState(false);
+
+  useEffect(() => {
+    const adminSession = localStorage.getItem('admin_session');
+    setIsDevAdmin(!!adminSession);
+  }, []);
+
+  const handleLogout = async () => {
+    // Clear admin session if exists
+    localStorage.removeItem('admin_session');
+    setIsDevAdmin(false);
+    // Clear Firebase session
+    await logout();
+  };
 
   const filteredProducts = searchQuery.length >= 2
     ? products.filter((p) =>
@@ -254,17 +268,19 @@ export default function Navbar() {
 
             {/* User Menu */}
             <div ref={userMenuRef} className="relative ml-1">
-              {user ? (
+              {user || isDevAdmin ? (
                 <>
                   <button
                     onClick={() => setUserMenuOpen(!userMenuOpen)}
                     className="w-8 h-8 rounded-full overflow-hidden border-2 border-white/10 hover:border-primary-500/50 transition-colors"
                   >
-                    {user.photoURL ? (
+                    {user?.photoURL ? (
                       <img src={user.photoURL} alt="" className="w-full h-full object-cover" />
                     ) : (
-                      <div className="w-full h-full bg-primary-500/20 flex items-center justify-center text-primary-400 text-xs font-bold">
-                        {(user.displayName || user.email || '?')[0].toUpperCase()}
+                      <div className={`w-full h-full flex items-center justify-center text-xs font-bold ${
+                        isDevAdmin ? 'bg-amber-500/20 text-amber-400' : 'bg-primary-500/20 text-primary-400'
+                      }`}>
+                        {isDevAdmin ? 'A' : (user?.displayName || user?.email || '?')[0].toUpperCase()}
                       </div>
                     )}
                   </button>
@@ -278,19 +294,21 @@ export default function Navbar() {
                         className="absolute right-0 top-full mt-2 w-48 bg-surface-900/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-xl overflow-hidden"
                       >
                         <div className="px-4 py-3 border-b border-white/5">
-                          <p className="text-white text-sm font-medium truncate">{user.displayName || 'User'}</p>
-                          <p className="text-slate-500 text-xs truncate">{user.email}</p>
+                          <p className="text-white text-sm font-medium truncate">{isDevAdmin ? 'Admin (Dev)' : user?.displayName || 'User'}</p>
+                          <p className="text-slate-500 text-xs truncate">{isDevAdmin ? 'Development mode' : user?.email}</p>
                         </div>
-                        <Link to="/profile" className="flex items-center gap-2 px-4 py-2.5 text-sm text-slate-300 hover:bg-white/5 hover:text-white transition-colors">
-                          <User size={14} /> My Profile
-                        </Link>
-                        {isAdminUser && (
+                        {!isDevAdmin && (
+                          <Link to="/profile" className="flex items-center gap-2 px-4 py-2.5 text-sm text-slate-300 hover:bg-white/5 hover:text-white transition-colors">
+                            <User size={14} /> My Profile
+                          </Link>
+                        )}
+                        {(isAdminUser || isDevAdmin) && (
                           <Link to="/admin" className="flex items-center gap-2 px-4 py-2.5 text-sm text-slate-300 hover:bg-white/5 hover:text-white transition-colors">
                             <Shield size={14} /> Admin Panel
                           </Link>
                         )}
                         <button
-                          onClick={async () => { await logout(); navigate('/'); setUserMenuOpen(false); }}
+                          onClick={async () => { await handleLogout(); navigate('/'); setUserMenuOpen(false); }}
                           className="flex items-center gap-2 px-4 py-2.5 text-sm text-red-400 hover:bg-white/5 w-full text-left transition-colors"
                         >
                           <LogOut size={14} /> Sign Out
@@ -411,14 +429,21 @@ export default function Navbar() {
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: (navLinks.length + 2) * 0.05 }}
               >
-                {user ? (
-                  <div className="flex gap-2 mt-2">
-                    <Link to="/profile" className="flex-1 text-center btn-secondary text-sm py-2.5">
-                      Profile
-                    </Link>
+                {user || isDevAdmin ? (
+                  <div className="flex flex-col gap-2 mt-2">
+                    {!isDevAdmin && (
+                      <Link to="/profile" className="text-center btn-secondary text-sm py-2.5">
+                        Profile
+                      </Link>
+                    )}
+                    {(isAdminUser || isDevAdmin) && (
+                      <Link to="/admin" className="text-center btn-secondary text-sm py-2.5">
+                        Admin Panel
+                      </Link>
+                    )}
                     <button
-                      onClick={async () => { await logout(); navigate('/'); }}
-                      className="flex-1 text-center text-sm py-2.5 rounded-xl border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-colors"
+                      onClick={async () => { await handleLogout(); navigate('/'); }}
+                      className="text-center text-sm py-2.5 rounded-xl border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-colors"
                     >
                       Sign Out
                     </button>

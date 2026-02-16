@@ -44,6 +44,15 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     if (authLoading) return;
+    
+    // Check for admin session (development login)
+    const adminSession = localStorage.getItem('admin_session');
+    if (adminSession) {
+      // Admin via dev credentials, allow access
+      return;
+    }
+    
+    // Otherwise check Firebase auth
     if (!user || !isAdminUser) {
       navigate('/', { replace: true });
       return;

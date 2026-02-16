@@ -7,7 +7,7 @@ import { useToast } from '@/context/ToastContext';
 import ScrollReveal from '@/components/shared/ScrollReveal';
 import type { ConfirmationResult } from 'firebase/auth';
 
-type Tab = 'login' | 'register' | 'phone';
+type Tab = 'login' | 'register' | 'phone' | 'admin';
 
 export default function Login() {
   const { loginWithEmail, registerWithEmail, loginWithGoogle, sendPhoneOTP, user } = useAuth();
@@ -29,6 +29,11 @@ export default function Login() {
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
   const [confirmResult, setConfirmResult] = useState<ConfirmationResult | null>(null);
+
+  // Admin form
+  const [adminUser, setAdminUser] = useState('');
+  const [adminPass, setAdminPass] = useState('');
+  const [adminShowPw, setAdminShowPw] = useState(false);
 
   // Redirect if already logged in
   if (user) {
@@ -97,10 +102,25 @@ export default function Login() {
     setBusy(false);
   }
 
+  async function handleAdminLogin(e: FormEvent) {
+    e.preventDefault();
+    if (adminUser === 'admin' && adminPass === 'admin') {
+      localStorage.setItem(
+        'admin_session',
+        JSON.stringify({ role: 'admin', loginTime: new Date().toISOString() })
+      );
+      toast('Admin logged in successfully!', 'success');
+      navigate('/admin', { replace: true });
+    } else {
+      toast('Invalid admin credentials', 'error');
+    }
+  }
+
   const tabs: { key: Tab; label: string }[] = [
     { key: 'login', label: 'Sign In' },
     { key: 'register', label: 'Register' },
     { key: 'phone', label: 'Phone' },
+    { key: 'admin', label: 'Admin' },
   ];
 
   return (
@@ -313,6 +333,69 @@ export default function Login() {
                     </form>
                   )}
                 </motion.div>
+              )}
+
+              {/* Admin Login */}
+              {tab === 'admin' && (
+                <motion.form
+                  key="admin"
+                  onSubmit={handleAdminLogin}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="space-y-4"
+                >
+                  <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 flex gap-3 mb-4">
+                    <div className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 text-xs flex items-center justify-center flex-shrink-0 font-bold">!</div>
+                    <p className="text-amber-200 text-sm">Development only: Use <span className="font-mono font-semibold">admin</span> / <span className="font-mono font-semibold">admin</span></p>
+                  </div>
+                  <div>
+                    <label className="block text-sm text-slate-400 mb-2 font-medium">Username</label>
+                    <div className="relative">
+                      <User size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                      <input
+                        type="text"
+                        value={adminUser}
+                        onChange={(e) => setAdminUser(e.target.value)}
+                        placeholder="admin"
+                        className="input-field w-full pl-10"
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm text-slate-400 mb-2 font-medium">Password</label>
+                    <div className="relative">
+                      <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                      <input
+                        type={adminShowPw ? 'text' : 'password'}
+                        value={adminPass}
+                        onChange={(e) => setAdminPass(e.target.value)}
+                        placeholder="•••••••"
+                        className="input-field w-full pl-10 pr-10"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setAdminShowPw(!adminShowPw)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-400"
+                      >
+                        {adminShowPw ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={busy}
+                    className="btn-primary w-full inline-flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    {busy ? (
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <>Login as Admin <ArrowRight size={16} /></>
+                    )}
+                  </button>
+                </motion.form>
               )}
             </AnimatePresence>
 
