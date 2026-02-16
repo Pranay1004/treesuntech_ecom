@@ -27,6 +27,7 @@ const contactInfo = [
     icon: <MapPin size={20} />,
     label: 'Workshop',
     value: 'Shop No. 18, Gokul Nagari, Rees, Rasayani, MH 410222',
+    href: 'https://www.google.com/maps/search/Shop+No.+18+Gokul+Nagari+Rees+Rasayani+Maharashtra+410222',
   },
   {
     icon: <Clock size={20} />,
