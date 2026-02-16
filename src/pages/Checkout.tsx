@@ -1,15 +1,26 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft, CreditCard, Truck, CheckCircle2, Package } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { useToast } from '@/context/ToastContext';
+import { useAuth } from '@/context/AuthContext';
 import ScrollReveal from '@/components/shared/ScrollReveal';
+import {
+  createOrder,
+  cartItemsToOrderItems,
+  getUserProfile,
+  type Address,
+} from '@/lib/firestore';
 
 export default function Checkout() {
   const { items, totalPrice, clearCart } = useCart();
   const { toast } = useToast();
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [step, setStep] = useState<'details' | 'confirm' | 'success'>('details');
+  const [placedOrderId, setPlacedOrderId] = useState('');
+  const [busy, setBusy] = useState(false);
   const [form, setForm] = useState({
     name: '',
     email: '',
@@ -21,6 +32,38 @@ export default function Checkout() {
     notes: '',
     payment: 'cod',
   });
+
+  // Pre-fill from user profile
+  useEffect(() => {
+    if (!user) {
+      navigate('/login', { state: { from: '/checkout' } });
+      return;
+    }
+    (async () => {
+      const profile = await getUserProfile(user.uid);
+      if (profile) {
+        const defaultAddr = profile.addresses?.find((a) => a.isDefault) || profile.addresses?.[0];
+        setForm((prev) => ({
+          ...prev,
+          name: profile.displayName || prev.name,
+          email: profile.email || user.email || prev.email,
+          phone: profile.phone || prev.phone,
+          ...(defaultAddr ? {
+            address: defaultAddr.line1 + (defaultAddr.line2 ? `, ${defaultAddr.line2}` : ''),
+            city: defaultAddr.city,
+            state: defaultAddr.state,
+            pincode: defaultAddr.pincode,
+          } : {}),
+        }));
+      } else {
+        setForm((prev) => ({
+          ...prev,
+          email: user.email || prev.email,
+          name: user.displayName || prev.name,
+        }));
+      }
+    })();
+  }, [user, navigate]);
 
   const gst = Math.round(totalPrice * 0.18);
   const grandTotal = totalPrice + gst;
@@ -36,23 +79,38 @@ export default function Checkout() {
     setStep('confirm');
   }
 
-  function placeOrder() {
-    // In production, POST to backend here
-    const orderId = `TS-${Date.now().toString(36).toUpperCase()}`;
-    localStorage.setItem(
-      'treesun_last_order',
-      JSON.stringify({
-        orderId,
-        items,
-        total: grandTotal,
-        form,
-        date: new Date().toISOString(),
-        status: 'confirmed',
-      })
-    );
-    clearCart();
-    toast('Order placed successfully!', 'success');
-    setStep('success');
+  async function placeOrder() {
+    if (!user) return;
+    setBusy(true);
+    try {
+      const shippingAddress: Address = {
+        label: 'Shipping',
+        fullName: form.name,
+        phone: form.phone,
+        line1: form.address,
+        line2: '',
+        city: form.city,
+        state: form.state,
+        pincode: form.pincode,
+        isDefault: false,
+      };
+      const order = await createOrder(
+        user.uid,
+        user.email || form.email,
+        cartItemsToOrderItems(items),
+        shippingAddress,
+        form.payment,
+        form.notes
+      );
+      setPlacedOrderId(order.orderId);
+      clearCart();
+      toast('Order placed successfully!', 'success');
+      setStep('success');
+    } catch (err: any) {
+      toast(err.message || 'Failed to place order', 'error');
+    } finally {
+      setBusy(false);
+    }
   }
 
   if (items.length === 0 && step !== 'success') {
@@ -70,7 +128,6 @@ export default function Checkout() {
   }
 
   if (step === 'success') {
-    const lastOrder = JSON.parse(localStorage.getItem('treesun_last_order') || '{}');
     return (
       <div className="min-h-screen bg-surface-950 pt-24 pb-20">
         <div className="container-custom">
@@ -90,7 +147,7 @@ export default function Checkout() {
               <p className="text-slate-400 mb-2">
                 Your order ID is{' '}
                 <span className="text-primary-400 font-mono font-semibold">
-                  {lastOrder.orderId}
+                  {placedOrderId}
                 </span>
               </p>
               <p className="text-slate-500 text-sm mb-8">
@@ -117,7 +174,7 @@ export default function Checkout() {
               </div>
 
               <div className="flex flex-wrap gap-3 justify-center">
-                <Link to={`/order-tracking?id=${lastOrder.orderId}`} className="btn-primary inline-flex items-center gap-2">
+                <Link to={`/order-tracking?id=${placedOrderId}`} className="btn-primary inline-flex items-center gap-2">
                   Track Order
                 </Link>
                 <Link to="/products" className="px-5 py-2.5 text-sm text-slate-400 border border-white/10 rounded-lg hover:bg-white/5 transition-colors">
@@ -264,9 +321,10 @@ export default function Checkout() {
                     </button>
                     <button
                       onClick={placeOrder}
-                      className="flex-1 btn-primary"
+                      disabled={busy}
+                      className="flex-1 btn-primary disabled:opacity-50"
                     >
-                      Place Order
+                      {busy ? 'Placing…' : 'Place Order'}
                     </button>
                   </div>
                 </div>

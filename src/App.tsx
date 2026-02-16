@@ -5,6 +5,7 @@ import Footer from '@/components/layout/Footer';
 import ScrollToTop from '@/components/shared/ScrollToTop';
 import { CartProvider } from '@/context/CartContext';
 import { ToastProvider } from '@/context/ToastContext';
+import { AuthProvider } from '@/context/AuthContext';
 
 // Pages
 import Home from '@/pages/Home';
@@ -30,6 +31,9 @@ const RefundPolicy = lazy(() => import('@/pages/RefundPolicy'));
 const PrivacyPolicy = lazy(() => import('@/pages/PrivacyPolicy'));
 const TermsOfService = lazy(() => import('@/pages/TermsOfService'));
 const Support = lazy(() => import('@/pages/Support'));
+const Login = lazy(() => import('@/pages/Login'));
+const Profile = lazy(() => import('@/pages/Profile'));
+const AdminDashboard = lazy(() => import('@/pages/AdminDashboard'));
 
 function PageLoader() {
   return (
@@ -42,8 +46,9 @@ function PageLoader() {
 export default function App() {
   return (
     <BrowserRouter>
-      <CartProvider>
-        <ToastProvider>
+      <AuthProvider>
+        <CartProvider>
+          <ToastProvider>
           <ScrollToTop />
           <div className="flex flex-col min-h-screen bg-surface-950 text-white">
             <Navbar />
@@ -55,6 +60,11 @@ export default function App() {
                   <Route path="/products/:slug" element={<ProductDetail />} />
                   <Route path="/about" element={<About />} />
                   <Route path="/contact" element={<Contact />} />
+
+                  {/* Auth */}
+                  <Route path="/login" element={<Login />} />
+                  <Route path="/profile" element={<Profile />} />
+                  <Route path="/admin" element={<AdminDashboard />} />
 
                   {/* E-commerce */}
                   <Route path="/cart" element={<Cart />} />
@@ -94,8 +104,9 @@ export default function App() {
             </main>
             <Footer />
           </div>
-        </ToastProvider>
-      </CartProvider>
+          </ToastProvider>
+        </CartProvider>
+      </AuthProvider>
     </BrowserRouter>
   );
 }

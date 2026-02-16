@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, ChevronDown, ShoppingCart, Search } from 'lucide-react';
+import { Menu, X, ChevronDown, ShoppingCart, Search, User, LogOut, Shield } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useCart } from '@/context/CartContext';
+import { useAuth } from '@/context/AuthContext';
 import { products } from '@/lib/data/products';
 
 const navLinks = [
@@ -32,9 +33,12 @@ export default function Navbar() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const searchRef = useRef<HTMLDivElement>(null);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const { totalItems } = useCart();
+  const { user, isAdminUser, logout } = useAuth();
 
   const filteredProducts = searchQuery.length >= 2
     ? products.filter((p) =>
@@ -55,14 +59,18 @@ export default function Navbar() {
     setServicesOpen(false);
     setSearchOpen(false);
     setSearchQuery('');
+    setUserMenuOpen(false);
   }, [location]);
 
-  // Close search on outside click
+  // Close search and user menu on outside click
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
         setSearchOpen(false);
         setSearchQuery('');
+      }
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setUserMenuOpen(false);
       }
     }
     document.addEventListener('mousedown', handleClick);
@@ -243,6 +251,64 @@ export default function Navbar() {
             <Link to="/contact" className="btn-primary text-sm px-5 py-2.5 ml-1">
               Get Quote
             </Link>
+
+            {/* User Menu */}
+            <div ref={userMenuRef} className="relative ml-1">
+              {user ? (
+                <>
+                  <button
+                    onClick={() => setUserMenuOpen(!userMenuOpen)}
+                    className="w-8 h-8 rounded-full overflow-hidden border-2 border-white/10 hover:border-primary-500/50 transition-colors"
+                  >
+                    {user.photoURL ? (
+                      <img src={user.photoURL} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full bg-primary-500/20 flex items-center justify-center text-primary-400 text-xs font-bold">
+                        {(user.displayName || user.email || '?')[0].toUpperCase()}
+                      </div>
+                    )}
+                  </button>
+                  <AnimatePresence>
+                    {userMenuOpen && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 8 }}
+                        transition={{ duration: 0.15 }}
+                        className="absolute right-0 top-full mt-2 w-48 bg-surface-900/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-xl overflow-hidden"
+                      >
+                        <div className="px-4 py-3 border-b border-white/5">
+                          <p className="text-white text-sm font-medium truncate">{user.displayName || 'User'}</p>
+                          <p className="text-slate-500 text-xs truncate">{user.email}</p>
+                        </div>
+                        <Link to="/profile" className="flex items-center gap-2 px-4 py-2.5 text-sm text-slate-300 hover:bg-white/5 hover:text-white transition-colors">
+                          <User size={14} /> My Profile
+                        </Link>
+                        {isAdminUser && (
+                          <Link to="/admin" className="flex items-center gap-2 px-4 py-2.5 text-sm text-slate-300 hover:bg-white/5 hover:text-white transition-colors">
+                            <Shield size={14} /> Admin Panel
+                          </Link>
+                        )}
+                        <button
+                          onClick={async () => { await logout(); navigate('/'); setUserMenuOpen(false); }}
+                          className="flex items-center gap-2 px-4 py-2.5 text-sm text-red-400 hover:bg-white/5 w-full text-left transition-colors"
+                        >
+                          <LogOut size={14} /> Sign Out
+                        </button>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </>
+              ) : (
+                <Link
+                  to="/login"
+                  className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-colors"
+                  aria-label="Sign in"
+                >
+                  <User size={18} />
+                </Link>
+              )}
+            </div>
           </div>
 
           {/* Mobile Toggle */}
@@ -339,6 +405,29 @@ export default function Navbar() {
                 <Link to="/contact" className="block w-full text-center btn-primary mt-4">
                   Get Quote
                 </Link>
+              </motion.div>
+              <motion.div
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: (navLinks.length + 2) * 0.05 }}
+              >
+                {user ? (
+                  <div className="flex gap-2 mt-2">
+                    <Link to="/profile" className="flex-1 text-center btn-secondary text-sm py-2.5">
+                      Profile
+                    </Link>
+                    <button
+                      onClick={async () => { await logout(); navigate('/'); }}
+                      className="flex-1 text-center text-sm py-2.5 rounded-xl border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-colors"
+                    >
+                      Sign Out
+                    </button>
+                  </div>
+                ) : (
+                  <Link to="/login" className="block w-full text-center btn-secondary mt-2 text-sm">
+                    Sign In / Register
+                  </Link>
+                )}
               </motion.div>
             </div>
           </motion.div>

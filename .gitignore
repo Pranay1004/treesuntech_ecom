@@ -6,5 +6,6 @@ Phase1
 prompt
 .env.local
 .env
+API
 .bak/
 treesuntech/

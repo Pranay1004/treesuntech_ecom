@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Search, Package, Clock, CheckCircle2, Truck, MapPin } from 'lucide-react';
+import { Search, Package, Clock, CheckCircle2, Truck, MapPin, Loader2 } from 'lucide-react';
 import ScrollReveal from '@/components/shared/ScrollReveal';
+import { getOrderByOrderId, type Order } from '@/lib/firestore';
 
 const statusSteps = [
   { key: 'confirmed', label: 'Order Confirmed', icon: CheckCircle2 },
@@ -15,37 +16,36 @@ export default function OrderTracking() {
   const [searchParams] = useSearchParams();
   const initialId = searchParams.get('id') || '';
   const [orderId, setOrderId] = useState(initialId);
-  const [order, setOrder] = useState<Record<string, unknown> | null>(null);
-  const [searched, setSearched] = useState(!!initialId);
+  const [order, setOrder] = useState<Order | null>(null);
+  const [searched, setSearched] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  async function lookupOrder(id: string) {
+    if (!id.trim()) return;
+    setLoading(true);
+    try {
+      const result = await getOrderByOrderId(id.trim());
+      setOrder(result);
+    } catch {
+      setOrder(null);
+    } finally {
+      setSearched(true);
+      setLoading(false);
+    }
+  }
 
   function handleSearch(e: React.FormEvent) {
     e.preventDefault();
-    const stored = localStorage.getItem('treesun_last_order');
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      if (parsed.orderId === orderId.trim()) {
-        setOrder(parsed);
-        setSearched(true);
-        return;
-      }
-    }
-    setOrder(null);
-    setSearched(true);
+    lookupOrder(orderId);
   }
 
-  // Load on initial render if ID from URL
-  if (initialId && !order && !searched) {
-    const stored = localStorage.getItem('treesun_last_order');
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      if (parsed.orderId === initialId) {
-        setOrder(parsed);
-      }
-    }
-    setSearched(true);
-  }
+  // Auto-search if order ID in URL
+  useEffect(() => {
+    if (initialId) lookupOrder(initialId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialId]);
 
-  const currentStatus = (order as Record<string, string>)?.status || 'confirmed';
+  const currentStatus = order?.status || 'confirmed';
   const statusIndex = statusSteps.findIndex((s) => s.key === currentStatus);
 
   return (
@@ -82,7 +82,14 @@ export default function OrderTracking() {
             </form>
 
             {/* Result */}
-            {searched && !order && (
+            {loading && (
+              <div className="text-center py-12">
+                <Loader2 size={32} className="mx-auto text-primary-400 animate-spin mb-4" />
+                <p className="text-slate-400">Looking up your order…</p>
+              </div>
+            )}
+
+            {searched && !loading && !order && (
               <div className="text-center py-12">
                 <Clock size={40} className="mx-auto text-slate-600 mb-4" />
                 <p className="text-slate-400">
@@ -97,7 +104,7 @@ export default function OrderTracking() {
               </div>
             )}
 
-            {order && (
+            {order && !loading && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -109,17 +116,23 @@ export default function OrderTracking() {
                     <div>
                       <p className="text-slate-500 text-xs uppercase tracking-wider">Order ID</p>
                       <p className="text-white font-mono font-semibold text-lg">
-                        {(order as Record<string, string>).orderId}
+                        {order.orderId}
                       </p>
                     </div>
                     <div className="text-right">
                       <p className="text-slate-500 text-xs uppercase tracking-wider">Date</p>
                       <p className="text-white text-sm">
-                        {new Date((order as Record<string, string>).date).toLocaleDateString('en-IN', {
-                          day: 'numeric',
-                          month: 'short',
-                          year: 'numeric',
-                        })}
+                        {order.createdAt?.toDate
+                          ? order.createdAt.toDate().toLocaleDateString('en-IN', {
+                              day: 'numeric',
+                              month: 'short',
+                              year: 'numeric',
+                            })
+                          : new Date(order.createdAt as unknown as string).toLocaleDateString('en-IN', {
+                              day: 'numeric',
+                              month: 'short',
+                              year: 'numeric',
+                            })}
                       </p>
                     </div>
                   </div>
@@ -163,20 +176,19 @@ export default function OrderTracking() {
                 {/* Items */}
                 <div className="p-6 rounded-2xl bg-white/[0.02] border border-white/10">
                   <h3 className="text-white font-semibold mb-4">Order Items</h3>
-                  {((order as Record<string, Array<{ product: { id: string; name: string; price: number; images: string[] }; quantity: number }>>).items || []).map(
-                    (item) => (
-                      <div key={item.product.id} className="flex items-center gap-4 py-3 border-b border-white/5 last:border-0">
+                  {(order.items || []).map((item) => (
+                      <div key={item.slug} className="flex items-center gap-4 py-3 border-b border-white/5 last:border-0">
                         <img
-                          src={item.product.images[0]}
-                          alt={item.product.name}
+                          src={item.image}
+                          alt={item.name}
                           className="w-12 h-12 rounded-lg object-cover bg-surface-900"
                         />
                         <div className="flex-1">
-                          <p className="text-white text-sm">{item.product.name}</p>
+                          <p className="text-white text-sm">{item.name}</p>
                           <p className="text-slate-500 text-xs">Qty: {item.quantity}</p>
                         </div>
                         <p className="text-white text-sm">
-                          ₹{(item.product.price * item.quantity).toLocaleString('en-IN')}
+                          ₹{(item.price * item.quantity).toLocaleString('en-IN')}
                         </p>
                       </div>
                     )
@@ -184,7 +196,7 @@ export default function OrderTracking() {
                   <div className="flex justify-between pt-4 mt-2 border-t border-white/10">
                     <span className="text-white font-semibold">Total</span>
                     <span className="text-primary-400 font-bold">
-                      ₹{((order as Record<string, number>).total || 0).toLocaleString('en-IN')}
+                      ₹{(order.total || 0).toLocaleString('en-IN')}
                     </span>
                   </div>
                 </div>

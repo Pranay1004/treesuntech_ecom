@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Send, Ticket, Mail, Clock, CheckCircle2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import ScrollReveal from '@/components/shared/ScrollReveal';
 import { useToast } from '@/context/ToastContext';
+import { useAuth } from '@/context/AuthContext';
+import { createTicket } from '@/lib/firestore';
 
 const issueTypes = [
   'Order Issue',
@@ -15,7 +17,10 @@ const issueTypes = [
 
 export default function Support() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [submitted, setSubmitted] = useState(false);
+  const [ticketResult, setTicketResult] = useState<{ ticketId: string; email: string; issueType: string; orderId: string; message: string } | null>(null);
+  const [busy, setBusy] = useState(false);
   const [form, setForm] = useState({
     name: '',
     email: '',
@@ -24,26 +29,55 @@ export default function Support() {
     message: '',
   });
 
+  // Pre-fill from auth user
+  useEffect(() => {
+    if (user) {
+      setForm((prev) => ({
+        ...prev,
+        name: user.displayName || prev.name,
+        email: user.email || prev.email,
+      }));
+    }
+  }, [user]);
+
   function handleChange(
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    // In production, POST to backend or email API
-    const ticketId = `TK-${Date.now().toString(36).toUpperCase()}`;
-    localStorage.setItem(
-      'treesun_last_ticket',
-      JSON.stringify({ ...form, ticketId, date: new Date().toISOString() })
-    );
-    toast('Support ticket submitted!', 'success');
-    setSubmitted(true);
+    setBusy(true);
+    try {
+      const ticketId = await createTicket({
+        ticketId: `TK-${Date.now().toString(36).toUpperCase()}`,
+        userId: user?.uid || 'anonymous',
+        userEmail: form.email,
+        name: form.name,
+        issueType: form.issueType,
+        message: form.message,
+        status: 'open',
+        ...(form.orderId ? { orderId: form.orderId } : {}),
+      });
+      setTicketResult({
+        ticketId,
+        email: form.email,
+        issueType: form.issueType,
+        orderId: form.orderId,
+        message: form.message,
+      });
+      toast('Support ticket submitted!', 'success');
+      setSubmitted(true);
+    } catch (err: any) {
+      toast(err.message || 'Failed to submit ticket', 'error');
+    } finally {
+      setBusy(false);
+    }
   }
 
-  if (submitted) {
-    const ticket = JSON.parse(localStorage.getItem('treesun_last_ticket') || '{}');
+  if (submitted && ticketResult) {
+    const ticket = ticketResult;
     return (
       <div className="min-h-screen bg-surface-950 pt-24 pb-20">
         <div className="container-custom">
@@ -75,7 +109,7 @@ export default function Support() {
               </div>
 
               <button
-                onClick={() => { setSubmitted(false); setForm({ name: '', email: '', orderId: '', issueType: 'Order Issue', message: '' }); }}
+                onClick={() => { setSubmitted(false); setTicketResult(null); setForm({ name: user?.displayName || '', email: user?.email || '', orderId: '', issueType: 'Order Issue', message: '' }); }}
                 className="mt-6 text-sm text-primary-400 hover:underline"
               >
                 Submit another ticket
@@ -139,9 +173,9 @@ export default function Support() {
                     className="input-field w-full"
                   />
 
-                  <button type="submit" className="btn-primary w-full inline-flex items-center justify-center gap-2">
+                  <button type="submit" disabled={busy} className="btn-primary w-full inline-flex items-center justify-center gap-2 disabled:opacity-50">
                     <Send size={16} />
-                    Submit Ticket
+                    {busy ? 'Submitting…' : 'Submit Ticket'}
                   </button>
                 </div>
               </form>
