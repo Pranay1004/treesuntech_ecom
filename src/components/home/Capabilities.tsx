@@ -15,30 +15,35 @@ const capabilities = [
     title: 'Rapid Prototyping',
     description:
       'Turn your ideas into tangible prototypes quickly. Perfect for product development, testing, and iteration.',
+    highlight: true,
   },
   {
     icon: <Cog size={24} />,
     title: 'Production Runs',
     description:
       'Small to medium batch production with consistent quality. Ideal for custom parts, enclosures, and components.',
+    highlight: true,
   },
   {
     icon: <Paintbrush size={24} />,
     title: 'Post Processing',
     description:
       'Sanding, painting, acetone smoothing, and finishing services for a professional look and feel.',
+    highlight: true,
   },
   {
     icon: <ShieldCheck size={24} />,
     title: 'Quality Assurance',
     description:
       'Every print is inspected for dimensional accuracy, layer adhesion, and surface finish before delivery.',
+    highlight: true,
   },
   {
     icon: <Lightbulb size={24} />,
     title: 'Design Consultation',
     description:
       'Need help optimising your design for 3D printing? We provide DFM feedback and slicing optimisation.',
+    highlight: true,
   },
 ];
 
