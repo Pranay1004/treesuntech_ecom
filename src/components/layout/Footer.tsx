@@ -5,8 +5,12 @@ const quickLinks = [
   { name: 'Products', path: '/products' },
   { name: 'About Us', path: '/about' },
   { name: 'Contact', path: '/contact' },
-  { name: 'Privacy Policy', path: '#' },
-  { name: 'Terms of Service', path: '#' },
+  { name: 'FAQ', path: '/faq' },
+  { name: 'Support', path: '/support' },
+  { name: 'Order Tracking', path: '/order-tracking' },
+  { name: 'Refund Policy', path: '/refund-policy' },
+  { name: 'Privacy Policy', path: '/privacy-policy' },
+  { name: 'Terms of Service', path: '/terms' },
 ];
 
 const services = [

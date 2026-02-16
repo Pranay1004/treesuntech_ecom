@@ -1,5 +1,8 @@
 import { Link } from 'react-router-dom';
-import { ShoppingCart, Clock, Ruler, Weight, Layers, Package } from 'lucide-react';
+import { ShoppingCart, Clock, Ruler, Weight, Layers, Package, Check } from 'lucide-react';
+import { useState } from 'react';
+import { useCart } from '@/context/CartContext';
+import { useToast } from '@/context/ToastContext';
 import type { Product } from '@/lib/data/products';
 
 interface ProductInfoProps {
@@ -7,6 +10,17 @@ interface ProductInfoProps {
 }
 
 export default function ProductInfo({ product }: ProductInfoProps) {
+  const { addToCart } = useCart();
+  const { toast } = useToast();
+  const [added, setAdded] = useState(false);
+
+  function handleAddToCart() {
+    addToCart(product);
+    toast(`${product.name} added to cart!`, 'cart');
+    setAdded(true);
+    setTimeout(() => setAdded(false), 1500);
+  }
+
   const specRows = [
     { icon: <Layers size={14} />, label: 'Technology', value: product.technology },
     { icon: <Package size={14} />, label: 'Material', value: product.material },
@@ -73,11 +87,23 @@ export default function ProductInfo({ product }: ProductInfoProps) {
 
       {/* CTA */}
       <div className="flex flex-wrap gap-3">
+        <button
+          onClick={handleAddToCart}
+          disabled={added}
+          className={`btn-primary inline-flex items-center gap-2 flex-1 justify-center ${
+            added ? 'bg-green-600 hover:bg-green-600' : ''
+          }`}
+        >
+          {added ? (
+            <><Check size={18} /> Added to Cart</>
+          ) : (
+            <><ShoppingCart size={18} /> Add to Cart</>
+          )}
+        </button>
         <Link
           to="/contact"
-          className="btn-primary inline-flex items-center gap-2 flex-1 justify-center"
+          className="btn-secondary inline-flex items-center gap-2 justify-center"
         >
-          <ShoppingCart size={18} />
           Request Quote
         </Link>
       </div>
