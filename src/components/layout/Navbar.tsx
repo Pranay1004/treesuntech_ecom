@@ -21,6 +21,7 @@ const navLinks = [
     ],
   },
   { name: 'About', path: '/about' },
+  { name: 'Track Order', path: '/order-tracking' },
   { name: 'Contact', path: '/contact' },
 ];
 

@@ -23,7 +23,7 @@ const services = [
 ];
 
 const socials = [
-  { icon: Instagram, href: '#', label: 'Instagram' },
+  { icon: Instagram, href: 'https://www.instagram.com/treesuntech_official/', label: 'Instagram' },
   { icon: Youtube, href: '#', label: 'YouTube' },
 ];
 
