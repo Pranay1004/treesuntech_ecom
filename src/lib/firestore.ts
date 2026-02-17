@@ -12,8 +12,22 @@ import {
   addDoc,
   type Timestamp,
 } from 'firebase/firestore';
-import { db, ADMIN_EMAIL } from './firebase';
+import { getFirebaseInstances } from './firebase-lazy';
 import type { Product } from './data/products';
+
+// Lazy load firebase instances
+let firebaseLoaded: ReturnType<typeof getFirebaseInstances> | null = null;
+
+async function getDb() {
+  if (!firebaseLoaded) {
+    firebaseLoaded = await getFirebaseInstances();
+  }
+  return firebaseLoaded.db;
+}
+
+function getAdminEmail() {
+  return import.meta.env.VITE_ADMIN_EMAIL || '';
+}
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -92,6 +106,7 @@ export interface SupportTicket {
 /* ------------------------------------------------------------------ */
 
 export async function createOrUpdateUser(uid: string, data: Partial<UserProfile>) {
+  const db = await getDb();
   const ref = doc(db, 'users', uid);
   const snap = await getDoc(ref);
   if (snap.exists()) {
@@ -113,11 +128,13 @@ export async function createOrUpdateUser(uid: string, data: Partial<UserProfile>
 }
 
 export async function getUserProfile(uid: string): Promise<UserProfile | null> {
+  const db = await getDb();
   const snap = await getDoc(doc(db, 'users', uid));
   return snap.exists() ? (snap.data() as UserProfile) : null;
 }
 
 export async function updateUserProfile(uid: string, data: Partial<UserProfile>) {
+  const db = await getDb();
   await updateDoc(doc(db, 'users', uid), { ...data, updatedAt: serverTimestamp() });
 }
 
@@ -149,7 +166,8 @@ export async function createOrder(
   items: OrderItem[],
   shippingAddress: Address,
   paymentMethod: string,
-  notes: string
+  notes:db = await getDb();
+  const  string
 ): Promise<Order> {
   const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
   const gst = Math.round(subtotal * 0.18);
@@ -185,7 +203,7 @@ export async function createOrder(
   return { ...order, id: ref.id };
 }
 
-export async function getUserOrders(userId: string): Promise<Order[]> {
+export adb = await getDb();
   const q = query(
     collection(db, 'orders'),
     where('userId', '==', userId),
@@ -196,11 +214,14 @@ export async function getUserOrders(userId: string): Promise<Order[]> {
 }
 
 export async function getAllOrders(): Promise<Order[]> {
+  const db = await getDb();
   const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'));
   const snap = await getDocs(q);
   return snap.docs.map((d) => ({ id: d.id, ...d.data() } as Order));
 }
 
+export async function getOrderByOrderId(orderId: string): Promise<Order | null> {
+  const db = await getDb();
 export async function getOrderByOrderId(orderId: string): Promise<Order | null> {
   const q = query(collection(db, 'orders'), where('orderId', '==', orderId));
   const snap = await getDocs(q);
@@ -210,7 +231,8 @@ export async function getOrderByOrderId(orderId: string): Promise<Order | null> 
 }
 
 export async function updateOrderStatus(
-  docId: string,
+  docId:db = await getDb();
+  const  string,
   status: OrderStatus,
   note: string = ''
 ) {
@@ -230,10 +252,7 @@ export async function updateOrderStatus(
 /* ------------------------------------------------------------------ */
 /*  Support ticket helpers                                             */
 /* ------------------------------------------------------------------ */
-
-export async function createTicket(
-  ticket: Omit<SupportTicket, 'id' | 'createdAt'>
-): Promise<string> {
+db = await getDb();
   const ref = await addDoc(collection(db, 'tickets'), {
     ...ticket,
     createdAt: serverTimestamp(),
@@ -242,14 +261,21 @@ export async function createTicket(
 }
 
 export async function getAllTickets(): Promise<SupportTicket[]> {
+  const db = await getDb();
   const q = query(collection(db, 'tickets'), orderBy('createdAt', 'desc'));
   const snap = await getDocs(q);
   return snap.docs.map((d) => ({ id: d.id, ...d.data() } as SupportTicket));
 }
 
 export async function updateTicketStatus(docId: string, status: SupportTicket['status']) {
-  await updateDoc(doc(db, 'tickets', docId), { status });
+  const db = await getDb();
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as SupportTicket));
 }
+
+export async function updateTicketStatus(docId: string, status: SupportTicket['status']) {
+  await updateDoc(doc(db, 'tickets', docId), { status });
+}const adminEmail = getAdminEmail();
+  return !!email && email.toLowerCase() === adminEmail
 
 /* ------------------------------------------------------------------ */
 /*  Admin check                                                        */
