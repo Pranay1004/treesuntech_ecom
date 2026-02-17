@@ -165,7 +165,7 @@ export default function Profile() {
             <div className="flex items-center justify-between mb-8">
               <div className="flex items-center gap-4">
                 {user?.photoURL ? (
-                  <img src={user.photoURL} alt="" className="w-14 h-14 rounded-full border-2 border-primary-500/30" />
+                  <img src={user.photoURL} alt="" loading="lazy" decoding="async" className="w-14 h-14 rounded-full border-2 border-primary-500/30" />
                 ) : (
                   <div className="w-14 h-14 rounded-full bg-primary-500/20 flex items-center justify-center text-primary-400 text-xl font-bold">
                     {(profile?.displayName || user?.email || '?')[0].toUpperCase()}

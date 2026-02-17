@@ -181,6 +181,8 @@ export default function OrderTracking() {
                         <img
                           src={item.image}
                           alt={item.name}
+                          loading="lazy"
+                          decoding="async"
                           className="w-12 h-12 rounded-lg object-cover bg-surface-900"
                         />
                         <div className="flex-1">

@@ -9,14 +9,20 @@
     <meta property="og:title" content="TREESUN TECHNICAL SOLUTIONS | FDM 3D Printing Mumbai" />
     <meta property="og:description" content="Professional FDM 3D printing services in Mumbai, India. Custom prototypes, scale models, and production parts." />
     <meta property="og:type" content="website" />
+    
+    <!-- Critical preconnect for performance -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="dns-prefetch" href="https://www.googletagmanager.com" />
+    
+    <!-- Non-blocking fonts with fallback -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'" />
     <noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" /></noscript>
+    
     <title>TREESUN TECHNICAL SOLUTIONS | FDM 3D Printing Services Mumbai</title>
   </head>
   <body class="bg-surface-950 text-slate-100 antialiased">
     <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+    <script type="module" src="/src/main.tsx" defer></script>
   </body>
 </html>

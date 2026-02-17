@@ -302,7 +302,7 @@ export default function Checkout() {
                     <h3 className="text-white font-semibold mb-4">Order Review</h3>
                     {items.map((item) => (
                       <div key={item.product.id} className="flex items-center gap-4 py-3 border-b border-white/5 last:border-0">
-                        <img src={item.product.images[0]} alt={item.product.name} className="w-14 h-14 rounded-lg object-cover bg-surface-900" />
+                        <img src={item.product.images[0]} alt={item.product.name} loading="lazy" decoding="async" className="w-14 h-14 rounded-lg object-cover bg-surface-900" />
                         <div className="flex-1 min-w-0">
                           <p className="text-white text-sm font-medium truncate">{item.product.name}</p>
                           <p className="text-slate-500 text-xs">Qty: {item.quantity}</p>

@@ -28,6 +28,8 @@ export default function ImageGallery({ images, name }: ImageGalleryProps) {
               src={images[activeIndex]}
               alt={`${name} - Image ${activeIndex + 1}`}
               className="w-full h-full object-cover"
+              loading="eager"
+              decoding="async"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}

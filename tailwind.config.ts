@@ -2,7 +2,13 @@ import type { Config } from 'tailwindcss';
 
 export default {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
-  theme: {
+  safelist: [
+    // Dynamic color classes that might not be detected
+    { pattern: /^(w|h)-(12|14|16|20|24)$/ },
+    { pattern: /^text-(primary|accent|slate)-/ },
+    { pattern: /^bg-(primary|accent|surface)-/ },
+    { pattern: /^border-(primary|accent|white)/ },
+  ],
     extend: {
       colors: {
         primary: {

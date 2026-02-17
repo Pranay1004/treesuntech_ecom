@@ -13,7 +13,7 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          // Firebase: ~200KB gzipped — load as separate chunk
+          // Firebase: ~200KB gzipped — load as separate chunk (lazy loaded now)
           firebase: ['firebase/app', 'firebase/auth', 'firebase/firestore'],
           // Framer Motion: ~100KB — separate chunk
           'framer-motion': ['framer-motion'],
@@ -24,5 +24,17 @@ export default defineConfig({
     },
     target: 'es2020',
     cssMinify: true,
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: true,
+        drop_debugger: true,
+      },
+    },
+  },
+  server: {
+    headers: {
+      'Cache-Control': 'no-cache',
+    },
   },
 })
