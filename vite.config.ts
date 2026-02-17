@@ -9,4 +9,20 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Firebase: ~200KB gzipped — load as separate chunk
+          firebase: ['firebase/app', 'firebase/auth', 'firebase/firestore'],
+          // Framer Motion: ~100KB — separate chunk
+          'framer-motion': ['framer-motion'],
+          // React core: cached separately
+          vendor: ['react', 'react-dom', 'react-router-dom'],
+        },
+      },
+    },
+    target: 'es2020',
+    cssMinify: true,
+  },
 })

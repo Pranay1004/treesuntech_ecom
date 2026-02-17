@@ -2,23 +2,18 @@ import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 
-/* ─── floating ring ─── */
+/* ─── floating ring — pure CSS animation to reduce JS overhead ─── */
 function FloatingRing({ size, x, y, delay }: { size: number; x: string; y: string; delay: number }) {
   return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.6 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ delay, duration: 1.8, ease: 'easeOut' }}
-      className="absolute pointer-events-none"
-      style={{ left: x, top: y }}
+    <div
+      className="absolute pointer-events-none animate-fade-in"
+      style={{ left: x, top: y, animationDelay: `${delay}s` }}
     >
-      <motion.div
-        animate={{ rotate: 360 }}
-        transition={{ duration: 40 + delay * 10, repeat: Infinity, ease: 'linear' }}
-        className="rounded-full border border-white/[0.06]"
-        style={{ width: size, height: size }}
+      <div
+        className="rounded-full border border-white/[0.06] animate-spin-slow"
+        style={{ width: size, height: size, animationDuration: `${40 + delay * 10}s` }}
       />
-    </motion.div>
+    </div>
   );
 }
 
@@ -127,14 +122,10 @@ export default function Hero() {
         </motion.div>
       </div>
 
-      {/* ── Material ticker ── */}
+      {/* ── Material ticker — CSS animation for performance ── */}
       <div className="absolute bottom-0 left-0 right-0 border-t border-white/5 bg-surface-950/80 backdrop-blur-sm">
         <div className="overflow-hidden py-4">
-          <motion.div
-            animate={{ x: ['0%', '-50%'] }}
-            transition={{ duration: 30, repeat: Infinity, ease: 'linear' }}
-            className="flex gap-8 whitespace-nowrap"
-          >
+          <div className="flex gap-8 whitespace-nowrap animate-ticker">
             {materials.map((m, i) => (
               <span
                 key={i}
@@ -144,7 +135,7 @@ export default function Hero() {
                 {m}
               </span>
             ))}
-          </motion.div>
+          </div>
         </div>
       </div>
     </section>

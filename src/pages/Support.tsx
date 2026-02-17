@@ -5,6 +5,7 @@ import ScrollReveal from '@/components/shared/ScrollReveal';
 import { useToast } from '@/context/ToastContext';
 import { useAuth } from '@/context/AuthContext';
 import { createTicket } from '@/lib/firestore';
+import { sendSupportTicketEmail } from '@/lib/email';
 
 const issueTypes = [
   'Order Issue',
@@ -60,6 +61,16 @@ export default function Support() {
         status: 'open',
         ...(form.orderId ? { orderId: form.orderId } : {}),
       });
+      
+      // Send email notifications
+      await sendSupportTicketEmail(
+        form.email,
+        form.name,
+        ticketId,
+        form.issueType,
+        form.message
+      );
+      
       setTicketResult({
         ticketId,
         email: form.email,

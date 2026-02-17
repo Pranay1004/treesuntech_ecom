@@ -17,6 +17,7 @@ import {
   type OrderStatus,
   type SupportTicket,
 } from '@/lib/firestore';
+import { sendOrderStatusEmail } from '@/lib/email';
 
 const statusConfig: Record<OrderStatus, { label: string; color: string; icon: typeof Clock }> = {
   confirmed: { label: 'Confirmed', color: 'text-blue-400 bg-blue-500/10 border-blue-500/20', icon: Clock },
@@ -41,14 +42,23 @@ export default function AdminDashboard() {
   const [statusFilter, setStatusFilter] = useState<OrderStatus | 'all'>('all');
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [authTimeout, setAuthTimeout] = useState(false);
 
   useEffect(() => {
-    if (authLoading) return;
+    // Timeout auth check after 5 seconds (Firebase might be slow on Vercel)
+    const timer = setTimeout(() => setAuthTimeout(true), 5000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    // Allow access if authLoading is done OR timeout reached
+    if (authLoading && !authTimeout) return;
     
-    // Check for admin session (development login)
+    // Check for admin session (credential-based login)
     const adminSession = localStorage.getItem('admin_session');
     if (adminSession) {
-      // Admin via dev credentials, allow access
+      // Admin via credentials — fetch data immediately
+      fetchData();
       return;
     }
     
@@ -58,7 +68,7 @@ export default function AdminDashboard() {
       return;
     }
     fetchData();
-  }, [user, isAdminUser, authLoading, navigate]);
+  }, [user, isAdminUser, authLoading, authTimeout, navigate]);
 
   async function fetchData() {
     setLoading(true);
@@ -83,6 +93,24 @@ export default function AdminDashboard() {
           o.id === order.id ? { ...o, status: newStatus } : o
         )
       );
+      
+      // Send status update email
+      const statusMessages: Record<OrderStatus, string> = {
+        confirmed: 'Your order has been confirmed. We will begin production soon.',
+        production: 'Your order is now in production. Our team is working on it.',
+        shipped: 'Great news! Your order has been shipped. You can track it using your order ID.',
+        delivered: 'Your order has been delivered successfully. Thank you for your purchase!',
+        cancelled: 'Your order has been cancelled. If you have any questions, please contact support.',
+      };
+      
+      await sendOrderStatusEmail(
+        order.userEmail,
+        order.shippingAddress.fullName,
+        order.orderId,
+        newStatus,
+        statusMessages[newStatus]
+      );
+      
       toast(`Order ${order.orderId} updated to ${newStatus}`, 'success');
     } catch {
       toast('Failed to update status', 'error');

@@ -12,6 +12,7 @@ import {
   getUserProfile,
   type Address,
 } from '@/lib/firestore';
+import { sendOrderConfirmationEmail } from '@/lib/email';
 
 export default function Checkout() {
   const { items, totalPrice, clearCart } = useCart();
@@ -102,6 +103,20 @@ export default function Checkout() {
         form.payment,
         form.notes
       );
+      
+      // Send confirmation email
+      await sendOrderConfirmationEmail(
+        form.email,
+        form.name,
+        order.orderId,
+        items.map(item => ({
+          name: item.product.name,
+          quantity: item.quantity,
+          price: item.product.price,
+        })),
+        order.total
+      );
+      
       setPlacedOrderId(order.orderId);
       clearCart();
       toast('Order placed successfully!', 'success');

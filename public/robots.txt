@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://treesuntech-ecom.vercel.app/sitemap.xml

@@ -17,7 +17,7 @@ import {
   type User,
   type ConfirmationResult,
 } from 'firebase/auth';
-import { auth, googleProvider } from '@/lib/firebase';
+import { auth, googleProvider, appleProvider } from '@/lib/firebase';
 import { createOrUpdateUser, isAdmin } from '@/lib/firestore';
 
 interface AuthContextValue {
@@ -27,6 +27,7 @@ interface AuthContextValue {
   loginWithEmail: (email: string, password: string) => Promise<void>;
   registerWithEmail: (email: string, password: string, name: string) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
+  loginWithApple: () => Promise<void>;
   sendPhoneOTP: (phone: string) => Promise<ConfirmationResult>;
   logout: () => Promise<void>;
 }
@@ -78,6 +79,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   }
 
+  async function loginWithApple() {
+    const result = await signInWithPopup(auth, appleProvider);
+    await createOrUpdateUser(result.user.uid, {
+      email: result.user.email || '',
+      displayName: result.user.displayName || '',
+      photoURL: result.user.photoURL || '',
+    });
+  }
+
   async function sendPhoneOTP(phone: string): Promise<ConfirmationResult> {
     const recaptchaContainer = document.getElementById('recaptcha-container');
     if (!recaptchaContainer) throw new Error('reCAPTCHA container not found');
@@ -100,6 +110,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loginWithEmail,
         registerWithEmail,
         loginWithGoogle,
+        loginWithApple,
         sendPhoneOTP,
         logout,
       }}
