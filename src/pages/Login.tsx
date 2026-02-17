@@ -121,6 +121,28 @@ export default function Login() {
     e.preventDefault();
     setBusy(true);
     try {
+      // Development mode: Use environment variables for admin credentials
+      if (import.meta.env.DEV) {
+        const expectedUsername = import.meta.env.VITE_ADMIN_USERNAME || 'admin';
+        const expectedPassword = import.meta.env.VITE_ADMIN_PASSWORD || 'admin';
+        
+        if (adminUser === expectedUsername && adminPass === expectedPassword) {
+          localStorage.setItem(
+            'admin_session',
+            JSON.stringify({ role: 'admin', token: 'dev-token-' + Date.now(), loginTime: new Date().toISOString() })
+          );
+          toast('Admin logged in successfully!', 'success');
+          navigate('/admin', { replace: true });
+          setBusy(false);
+          return;
+        } else {
+          toast('Invalid admin credentials', 'error');
+          setBusy(false);
+          return;
+        }
+      }
+
+      // Production mode: Use API endpoint
       const response = await fetch('/api/admin-login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
