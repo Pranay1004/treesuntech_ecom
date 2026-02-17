@@ -265,9 +265,8 @@ export default function AdminDashboard() {
                 <div className="space-y-3">
                   {filteredOrders.map((order) => {
                     const cfg = statusConfig[order.status];
-                    const StatusIcon = cfg.icon;
+                    const CfgIcon = cfg.icon;
                     const isExpanded = expandedOrder === order.id;
-                    const nextStatus = statusFlow[statusFlow.indexOf(order.status) + 1];
 
                     return (
                       <motion.div
@@ -281,7 +280,7 @@ export default function AdminDashboard() {
                           className="w-full p-4 flex items-center justify-between text-left"
                         >
                           <div className="flex items-center gap-3">
-                            <StatusIcon size={18} className={cfg.color.split(' ')[0]} />
+                            <CfgIcon size={18} className={cfg.color.split(' ')[0]} />
                             <div>
                               <p className="text-white font-mono font-semibold text-sm">{order.orderId}</p>
                               <p className="text-slate-500 text-xs">{order.userEmail}</p>
@@ -368,31 +367,29 @@ export default function AdminDashboard() {
                                   </div>
                                 )}
 
-                                {/* Actions */}
-                                <div className="flex flex-wrap gap-2 pt-2 border-t border-white/5">
-                                  {nextStatus && order.status !== 'cancelled' && (
-                                    <button
-                                      onClick={() => handleStatusUpdate(order, nextStatus)}
-                                      disabled={updatingId === order.id}
-                                      className="btn-primary text-xs px-4 py-2 inline-flex items-center gap-1.5 disabled:opacity-50"
-                                    >
-                                      {updatingId === order.id ? (
-                                        <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                      ) : (
-                                        <StatusIcon size={12} />
-                                      )}
-                                      Move to {statusConfig[nextStatus].label}
-                                    </button>
-                                  )}
-                                  {order.status !== 'cancelled' && order.status !== 'delivered' && (
-                                    <button
-                                      onClick={() => handleStatusUpdate(order, 'cancelled')}
-                                      disabled={updatingId === order.id}
-                                      className="btn-ghost text-xs px-4 py-2 text-red-400 hover:text-red-300 inline-flex items-center gap-1.5"
-                                    >
-                                      <XCircle size={12} /> Cancel Order
-                                    </button>
-                                  )}
+                                {/* Actions - Bidirectional status change */}
+                                <div className="flex flex-wrap gap-2 pt-2 border-t border-white/5 items-center">
+                                  <span className="text-slate-500 text-xs mr-1">Change status:</span>
+                                  {(Object.keys(statusConfig) as OrderStatus[]).map((s) => {
+                                    if (s === order.status) return null;
+                                    const scfg = statusConfig[s];
+                                    const Icon = scfg.icon;
+                                    return (
+                                      <button
+                                        key={s}
+                                        onClick={() => handleStatusUpdate(order, s)}
+                                        disabled={updatingId === order.id}
+                                        className={`text-xs px-3 py-1.5 rounded-lg border transition inline-flex items-center gap-1.5 disabled:opacity-50 ${scfg.color}`}
+                                      >
+                                        {updatingId === order.id ? (
+                                          <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                                        ) : (
+                                          <Icon size={12} />
+                                        )}
+                                        {scfg.label}
+                                      </button>
+                                    );
+                                  })}
                                 </div>
                               </div>
                             </motion.div>

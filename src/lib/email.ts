@@ -11,6 +11,13 @@ export interface EmailPayload {
 
 export async function sendEmail(payload: EmailPayload): Promise<{ success: boolean; messageId?: string }> {
   try {
+    // In dev mode, log the email and simulate success (no serverless function available)
+    if (import.meta.env.DEV) {
+      console.log('[DEV EMAIL]', payload.to, payload.subject);
+      console.log('[DEV EMAIL HTML]', payload.html.substring(0, 200) + '...');
+      return { success: true, messageId: 'dev-' + Date.now() };
+    }
+
     const response = await fetch('/api/send-email', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

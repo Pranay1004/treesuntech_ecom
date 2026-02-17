@@ -6,7 +6,11 @@ Phase1
 prompt
 .env.local
 .env
-API
+/API
 .bak/
 treesuntech/
 old/API
+
+# Vercel serverless functions (don't ignore)
+!api/
+!api/**

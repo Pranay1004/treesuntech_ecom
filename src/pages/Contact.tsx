@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Mail, Phone, MapPin, Send, Clock, ArrowRight } from 'lucide-react';
 import ScrollReveal from '@/components/shared/ScrollReveal';
 import Uploader from '@/components/shared/Uploader';
+import { sendEmail } from '@/lib/email';
 
 const contactInfo = [
   {
@@ -46,6 +47,8 @@ export default function Contact() {
   });
   const [uploadedUrls, setUploadedUrls] = useState<string[]>([]);
   const [submitted, setSubmitted] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState('');
 
   function handleChange(
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
@@ -53,11 +56,88 @@ export default function Contact() {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    // In production, POST form + uploadedUrls to your backend
-    console.log('Form data:', form, 'Files:', uploadedUrls);
-    setSubmitted(true);
+    setSending(true);
+    setError('');
+
+    const adminEmail = import.meta.env.VITE_ADMIN_EMAIL || 'testkeysw@gmail.com';
+
+    const filesSection = uploadedUrls.length > 0
+      ? `<div style="margin-top:15px;"><strong>Attached Files:</strong><ul>${uploadedUrls.map(u => `<li><a href="${u}">${u}</a></li>`).join('')}</ul></div>`
+      : '';
+
+    // Send email to admin with customer inquiry
+    const adminHtml = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+        <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 20px; border-radius: 8px 8px 0 0;">
+          <h1 style="margin: 0;">New Contact Inquiry</h1>
+          <p style="margin: 5px 0 0 0; opacity: 0.9;">From ${form.name}</p>
+        </div>
+        <div style="padding: 20px; background: #f9fafb;">
+          <table style="width:100%;border-collapse:collapse;">
+            <tr><td style="padding:8px;font-weight:bold;width:100px;">Name</td><td style="padding:8px;">${form.name}</td></tr>
+            <tr><td style="padding:8px;font-weight:bold;">Email</td><td style="padding:8px;"><a href="mailto:${form.email}">${form.email}</a></td></tr>
+            <tr><td style="padding:8px;font-weight:bold;">Phone</td><td style="padding:8px;"><a href="tel:${form.phone}">${form.phone || 'Not provided'}</a></td></tr>
+            <tr><td style="padding:8px;font-weight:bold;">Subject</td><td style="padding:8px;">${form.subject || 'General Inquiry'}</td></tr>
+          </table>
+          <div style="margin-top:15px;background:white;padding:15px;border-radius:8px;border-left:4px solid #10b981;">
+            <strong>Message:</strong>
+            <p style="white-space:pre-wrap;">${form.message}</p>
+          </div>
+          ${filesSection}
+        </div>
+      </div>
+    `;
+
+    // Send confirmation to customer
+    const customerHtml = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+        <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 20px; border-radius: 8px 8px 0 0;">
+          <h1 style="margin: 0;">We've received your message!</h1>
+        </div>
+        <div style="padding: 20px; background: #f9fafb;">
+          <p>Hi ${form.name},</p>
+          <p>Thank you for contacting TREESUN Technical Solutions. We've received your inquiry and will get back to you within 24 hours.</p>
+          <div style="background:white;padding:15px;border-radius:8px;margin:15px 0;">
+            <p style="margin:0 0 5px;"><strong>Subject:</strong> ${form.subject || 'General Inquiry'}</p>
+            <p style="margin:0;"><strong>Your message:</strong></p>
+            <p style="color:#666;white-space:pre-wrap;">${form.message}</p>
+          </div>
+          <p style="color:#666;font-size:12px;margin-top:20px;">
+            TREESUN TECHNICAL SOLUTIONS<br>
+            Email: treesunonline@outlook.com<br>
+            Hours: Mon-Sat, 10 AM - 7 PM IST
+          </p>
+        </div>
+      </div>
+    `;
+
+    try {
+      // Send to admin
+      const result = await sendEmail({
+        to: adminEmail,
+        subject: `[New Inquiry] ${form.subject || 'Contact Form'} - from ${form.name}`,
+        html: adminHtml,
+      });
+
+      // Send confirmation to customer
+      await sendEmail({
+        to: form.email,
+        subject: `We've received your message - TREESUN`,
+        html: customerHtml,
+      });
+
+      if (result.success) {
+        setSubmitted(true);
+      } else {
+        setError('Failed to send message. Please try emailing us directly at treesunonline@outlook.com');
+      }
+    } catch {
+      setError('Network error. Please try emailing us directly at treesunonline@outlook.com');
+    }
+
+    setSending(false);
   }
 
   function handleUpload(url: string) {
@@ -192,12 +272,28 @@ export default function Contact() {
                     )}
                   </div>
 
+                  {error && (
+                    <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+                      {error}
+                    </div>
+                  )}
+
                   <button
                     type="submit"
-                    className="btn-primary w-full inline-flex items-center justify-center gap-2"
+                    disabled={sending}
+                    className="btn-primary w-full inline-flex items-center justify-center gap-2 disabled:opacity-50"
                   >
-                    Send Enquiry
-                    <ArrowRight size={16} />
+                    {sending ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        Sending...
+                      </>
+                    ) : (
+                      <>
+                        Send Enquiry
+                        <ArrowRight size={16} />
+                      </>
+                    )}
                   </button>
                 </form>
               )}
