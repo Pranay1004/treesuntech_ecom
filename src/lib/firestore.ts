@@ -166,9 +166,9 @@ export async function createOrder(
   items: OrderItem[],
   shippingAddress: Address,
   paymentMethod: string,
-  notes:db = await getDb();
-  const  string
+  notes: string
 ): Promise<Order> {
+  const db = await getDb();
   const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
   const gst = Math.round(subtotal * 0.18);
   const shipping = subtotal >= 5000 ? 0 : 250;
@@ -203,7 +203,8 @@ export async function createOrder(
   return { ...order, id: ref.id };
 }
 
-export adb = await getDb();
+export async function getUserOrders(userId: string): Promise<Order[]> {
+  const db = await getDb();
   const q = query(
     collection(db, 'orders'),
     where('userId', '==', userId),
@@ -222,7 +223,6 @@ export async function getAllOrders(): Promise<Order[]> {
 
 export async function getOrderByOrderId(orderId: string): Promise<Order | null> {
   const db = await getDb();
-export async function getOrderByOrderId(orderId: string): Promise<Order | null> {
   const q = query(collection(db, 'orders'), where('orderId', '==', orderId));
   const snap = await getDocs(q);
   if (snap.empty) return null;
@@ -231,11 +231,11 @@ export async function getOrderByOrderId(orderId: string): Promise<Order | null> 
 }
 
 export async function updateOrderStatus(
-  docId:db = await getDb();
-  const  string,
+  docId: string,
   status: OrderStatus,
   note: string = ''
 ) {
+  const db = await getDb();
   const ref = doc(db, 'orders', docId);
   const snap = await getDoc(ref);
   if (!snap.exists()) return;
@@ -252,7 +252,11 @@ export async function updateOrderStatus(
 /* ------------------------------------------------------------------ */
 /*  Support ticket helpers                                             */
 /* ------------------------------------------------------------------ */
-db = await getDb();
+
+export async function createTicket(
+  ticket: Omit<SupportTicket, 'id' | 'createdAt'>
+): Promise<string> {
+  const db = await getDb();
   const ref = await addDoc(collection(db, 'tickets'), {
     ...ticket,
     createdAt: serverTimestamp(),
@@ -269,18 +273,14 @@ export async function getAllTickets(): Promise<SupportTicket[]> {
 
 export async function updateTicketStatus(docId: string, status: SupportTicket['status']) {
   const db = await getDb();
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as SupportTicket));
-}
-
-export async function updateTicketStatus(docId: string, status: SupportTicket['status']) {
   await updateDoc(doc(db, 'tickets', docId), { status });
-}const adminEmail = getAdminEmail();
-  return !!email && email.toLowerCase() === adminEmail
+}
 
 /* ------------------------------------------------------------------ */
 /*  Admin check                                                        */
 /* ------------------------------------------------------------------ */
 
 export function isAdmin(email: string | null | undefined): boolean {
-  return !!email && email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  const adminEmail = getAdminEmail();
+  return !!email && adminEmail !== '' && email.toLowerCase() === adminEmail.toLowerCase();
 }
