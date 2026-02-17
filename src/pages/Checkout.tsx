@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, CreditCard, Truck, CheckCircle2, Package } from 'lucide-react';
+import { ArrowLeft, CreditCard, Truck, CheckCircle2, Package, Loader2, MessageCircle } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { useToast } from '@/context/ToastContext';
 import { useAuth } from '@/context/AuthContext';
@@ -10,18 +10,24 @@ import {
   createOrder,
   cartItemsToOrderItems,
   getUserProfile,
+  updateOrderPayment,
   type Address,
 } from '@/lib/firestore';
 import { sendOrderConfirmationEmail } from '@/lib/email';
+import { payWithRazorpay, payWithStripe, getShippingRates, type PaymentMethod } from '@/lib/payments';
 
 export default function Checkout() {
   const { items, totalPrice, clearCart } = useCart();
   const { toast } = useToast();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [step, setStep] = useState<'details' | 'confirm' | 'success'>('details');
   const [placedOrderId, setPlacedOrderId] = useState('');
   const [busy, setBusy] = useState(false);
+  const [shippingRates, setShippingRates] = useState<any[]>([]);
+  const [shippingLoading, setShippingLoading] = useState(false);
+  const [selectedShipping, setSelectedShipping] = useState<any>(null);
   const [form, setForm] = useState({
     name: '',
     email: '',
@@ -31,7 +37,7 @@ export default function Checkout() {
     state: 'Maharashtra',
     pincode: '',
     notes: '',
-    payment: 'cod',
+    payment: 'razorpay' as string,
   });
 
   // Pre-fill from user profile
@@ -40,6 +46,18 @@ export default function Checkout() {
       navigate('/login', { state: { from: '/checkout' } });
       return;
     }
+
+    // Handle Stripe return
+    if (searchParams.get('payment') === 'success') {
+      const orderId = searchParams.get('orderId');
+      if (orderId) {
+        setPlacedOrderId(orderId);
+        clearCart();
+        setStep('success');
+        return;
+      }
+    }
+
     (async () => {
       const profile = await getUserProfile(user.uid);
       if (profile) {
@@ -64,10 +82,29 @@ export default function Checkout() {
         }));
       }
     })();
-  }, [user, navigate]);
+  }, [user, navigate, searchParams, clearCart]);
+
+  // Fetch shipping rates when pincode changes
+  useEffect(() => {
+    if (form.pincode.length === 6) {
+      setShippingLoading(true);
+      getShippingRates(form.pincode, 0.5, form.payment === 'cod')
+        .then((result) => {
+          const rates = result?.options || [];
+          setShippingRates(rates);
+          if (rates.length > 0) setSelectedShipping(rates[0]);
+        })
+        .catch(() => setShippingRates([]))
+        .finally(() => setShippingLoading(false));
+    } else {
+      setShippingRates([]);
+      setSelectedShipping(null);
+    }
+  }, [form.pincode, form.payment]);
 
   const gst = Math.round(totalPrice * 0.18);
-  const grandTotal = totalPrice + gst;
+  const shippingCost = selectedShipping?.rate || 0;
+  const grandTotal = totalPrice + gst + shippingCost;
 
   function handleChange(
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
@@ -95,6 +132,78 @@ export default function Checkout() {
         pincode: form.pincode,
         isDefault: false,
       };
+
+      // For Razorpay: pay first, then create order
+      if (form.payment === 'razorpay') {
+        await payWithRazorpay({
+          amount: grandTotal,
+          orderId: `TS-${Date.now()}`,
+          customerName: form.name,
+          customerEmail: form.email,
+          customerPhone: form.phone,
+          onSuccess: async (paymentId, razorpayOrderId) => {
+            // Payment succeeded — create the order in Firestore
+            const order = await createOrder(
+              user.uid,
+              user.email || form.email,
+              cartItemsToOrderItems(items),
+              shippingAddress,
+              'razorpay',
+              form.notes
+            );
+            // Save payment info
+            await updateOrderPayment(order.id!, {
+              paymentMethod: 'razorpay',
+              paymentId,
+              razorpayOrderId,
+              paymentStatus: 'paid',
+            });
+            await sendOrderConfirmationEmail(
+              form.email, form.name, order.orderId,
+              items.map(item => ({ name: item.product.name, quantity: item.quantity, price: item.product.price })),
+              order.total
+            );
+            setPlacedOrderId(order.orderId);
+            clearCart();
+            toast('Payment successful! Order placed.', 'success');
+            setStep('success');
+          },
+          onFailure: (error) => {
+            toast(`Payment failed: ${error}`, 'error');
+          },
+        });
+        setBusy(false);
+        return;
+      }
+
+      // For Stripe: create order first (pending), then redirect
+      if (form.payment === 'stripe') {
+        const order = await createOrder(
+          user.uid,
+          user.email || form.email,
+          cartItemsToOrderItems(items),
+          shippingAddress,
+          'stripe',
+          form.notes
+        );
+        await updateOrderPayment(order.id!, {
+          paymentMethod: 'stripe',
+          paymentStatus: 'pending',
+        });
+        await payWithStripe({
+          items: items.map(i => ({
+            name: i.product.name,
+            price: i.product.price,
+            quantity: i.quantity,
+          })),
+          orderId: order.orderId,
+          customerEmail: form.email,
+        });
+        // Stripe redirects, so we won't reach here
+        return;
+      }
+
+      // For COD / UPI / Bank — just create order
       const order = await createOrder(
         user.uid,
         user.email || form.email,
@@ -192,6 +301,14 @@ export default function Checkout() {
                 <Link to={`/order-tracking?id=${placedOrderId}`} className="btn-primary inline-flex items-center gap-2">
                   Track Order
                 </Link>
+                <a
+                  href={`https://wa.me/919867046342?text=${encodeURIComponent(`Hi TREESUN, I just placed order ${placedOrderId}. Looking forward to updates!`)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-5 py-2.5 text-sm text-green-400 border border-green-500/20 rounded-lg hover:bg-green-500/10 transition-colors inline-flex items-center gap-2"
+                >
+                  <MessageCircle size={16} /> WhatsApp Us
+                </a>
                 <Link to="/products" className="px-5 py-2.5 text-sm text-slate-400 border border-white/10 rounded-lg hover:bg-white/5 transition-colors">
                   Continue Shopping
                 </Link>
@@ -247,8 +364,10 @@ export default function Checkout() {
                     </h3>
                     <div className="space-y-3">
                       {[
+                        { value: 'razorpay', label: 'Razorpay (UPI / Cards / Netbanking)', desc: 'Pay instantly via Google Pay, PhonePe, UPI, cards. ~2% fees.' },
+                        { value: 'stripe', label: 'Stripe (International Cards)', desc: 'Pay with Visa, Mastercard, Amex. Best for international orders.' },
                         { value: 'cod', label: 'Cash on Delivery (COD)', desc: 'Pay when you receive the order' },
-                        { value: 'upi', label: 'UPI / Google Pay / PhonePe', desc: 'Pay via UPI after order confirmation' },
+                        { value: 'upi', label: 'UPI (Manual)', desc: 'Pay via UPI after order confirmation' },
                         { value: 'bank', label: 'Bank Transfer (NEFT/IMPS)', desc: 'Details sent via email after order' },
                       ].map((opt) => (
                         <label
@@ -275,6 +394,55 @@ export default function Checkout() {
                       ))}
                     </div>
                   </div>
+
+                  {/* Shipping rates */}
+                  {form.pincode.length === 6 && (
+                    <div className="p-6 rounded-2xl bg-white/[0.02] border border-white/10">
+                      <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+                        <Truck size={18} className="text-primary-400" />
+                        Shipping Options
+                      </h3>
+                      {shippingLoading ? (
+                        <div className="flex items-center gap-2 text-slate-400 text-sm">
+                          <Loader2 size={14} className="animate-spin" /> Checking shipping rates...
+                        </div>
+                      ) : shippingRates.length > 0 ? (
+                        <div className="space-y-2">
+                          {shippingRates.slice(0, 5).map((rate, i) => (
+                            <label
+                              key={i}
+                              className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-all ${
+                                selectedShipping === rate
+                                  ? 'border-primary-500/50 bg-primary-500/5'
+                                  : 'border-white/10 hover:border-white/20'
+                              }`}
+                            >
+                              <div className="flex items-center gap-3">
+                                <input
+                                  type="radio"
+                                  name="shipping"
+                                  checked={selectedShipping === rate}
+                                  onChange={() => setSelectedShipping(rate)}
+                                  className="accent-emerald-500"
+                                />
+                                <div>
+                                  <p className="text-white text-sm">{rate.courier_name || rate.name || `Courier ${i + 1}`}</p>
+                                  <p className="text-slate-500 text-xs">
+                                    Est. {rate.estimated_delivery_days || rate.etd || '5-7'} days
+                                  </p>
+                                </div>
+                              </div>
+                              <p className="text-primary-400 text-sm font-semibold">
+                                ₹{(rate.rate || rate.freight_charge || 0).toLocaleString('en-IN')}
+                              </p>
+                            </label>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-slate-500 text-sm">No shipping options available for this pincode. We'll calculate shipping separately.</p>
+                      )}
+                    </div>
+                  )}
 
                   <div className="p-6 rounded-2xl bg-white/[0.02] border border-white/10">
                     <h3 className="text-white font-semibold mb-3">Order Notes (Optional)</h3>
@@ -323,7 +491,12 @@ export default function Checkout() {
                       {form.phone} &middot; {form.email}
                     </p>
                     <p className="text-slate-500 text-xs mt-2">
-                      Payment: {form.payment === 'cod' ? 'Cash on Delivery' : form.payment === 'upi' ? 'UPI' : 'Bank Transfer'}
+                      Payment: {
+                        form.payment === 'razorpay' ? 'Razorpay (UPI/Cards/Netbanking)' :
+                        form.payment === 'stripe' ? 'Stripe (International Cards)' :
+                        form.payment === 'cod' ? 'Cash on Delivery' :
+                        form.payment === 'upi' ? 'UPI' : 'Bank Transfer'
+                      }
                     </p>
                   </div>
 
@@ -375,7 +548,9 @@ export default function Checkout() {
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-400">Shipping</span>
-                    <span className="text-slate-400">TBD</span>
+                    <span className={selectedShipping ? 'text-white' : 'text-slate-400'}>
+                      {selectedShipping ? `₹${shippingCost.toLocaleString('en-IN')}` : 'TBD'}
+                    </span>
                   </div>
                   <div className="border-t border-white/10 pt-3 flex justify-between">
                     <span className="text-white font-semibold">Total</span>

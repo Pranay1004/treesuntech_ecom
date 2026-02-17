@@ -5,6 +5,7 @@ import {
   getDoc,
   getDocs,
   updateDoc,
+  deleteDoc,
   query,
   where,
   orderBy,
@@ -16,7 +17,7 @@ import { getFirebaseInstances } from './firebase-lazy';
 import type { Product } from './data/products';
 
 // Lazy load firebase instances
-let firebaseLoaded: ReturnType<typeof getFirebaseInstances> | null = null;
+let firebaseLoaded: Awaited<ReturnType<typeof getFirebaseInstances>> | null = null;
 
 async function getDb() {
   if (!firebaseLoaded) {
@@ -283,4 +284,120 @@ export async function updateTicketStatus(docId: string, status: SupportTicket['s
 export function isAdmin(email: string | null | undefined): boolean {
   const adminEmail = getAdminEmail();
   return !!email && adminEmail !== '' && email.toLowerCase() === adminEmail.toLowerCase();
+}
+
+/* ------------------------------------------------------------------ */
+/*  Product CRUD (Firestore-backed for admin management)               */
+/* ------------------------------------------------------------------ */
+
+export interface FirestoreProduct {
+  id?: string;
+  slug: string;
+  name: string;
+  category: string;
+  industry: string[];
+  material: string;
+  technology: 'FDM' | 'SLA' | 'Resin';
+  finish: string;
+  dimensions: string;
+  tolerance: string;
+  weight: string;
+  leadTime: string;
+  price: number;
+  description: string;
+  features: string[];
+  applications: string[];
+  images: string[];
+  specifications: Record<string, string>;
+  size: 'Small' | 'Medium' | 'Large';
+  featured: boolean;
+  active: boolean;
+  stock: number;
+  createdAt: Timestamp | null;
+  updatedAt: Timestamp | null;
+}
+
+export async function addProduct(product: Omit<FirestoreProduct, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
+  const db = await getDb();
+  const ref = await addDoc(collection(db, 'products'), {
+    ...product,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+  return ref.id;
+}
+
+export async function updateProduct(docId: string, data: Partial<FirestoreProduct>) {
+  const db = await getDb();
+  await updateDoc(doc(db, 'products', docId), {
+    ...data,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export async function deleteProduct(docId: string) {
+  const db = await getDb();
+  await deleteDoc(doc(db, 'products', docId));
+}
+
+export async function getAllProducts(): Promise<FirestoreProduct[]> {
+  const db = await getDb();
+  const q = query(collection(db, 'products'), orderBy('createdAt', 'desc'));
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as FirestoreProduct));
+}
+
+export async function getActiveProducts(): Promise<FirestoreProduct[]> {
+  const db = await getDb();
+  const q = query(
+    collection(db, 'products'),
+    where('active', '==', true),
+    orderBy('createdAt', 'desc')
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as FirestoreProduct));
+}
+
+export async function getProductById(docId: string): Promise<FirestoreProduct | null> {
+  const db = await getDb();
+  const snap = await getDoc(doc(db, 'products', docId));
+  return snap.exists() ? ({ id: snap.id, ...snap.data() } as FirestoreProduct) : null;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Order shipping / payment metadata                                  */
+/* ------------------------------------------------------------------ */
+
+export async function updateOrderPayment(
+  docId: string,
+  paymentData: {
+    paymentMethod: string;
+    paymentId?: string;
+    paymentStatus: 'pending' | 'paid' | 'failed' | 'refunded';
+    razorpayOrderId?: string;
+    stripeSessionId?: string;
+  }
+) {
+  const db = await getDb();
+  await updateDoc(doc(db, 'orders', docId), {
+    ...paymentData,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export async function updateOrderShipping(
+  docId: string,
+  shippingData: {
+    shipmentId?: string;
+    awbCode?: string;
+    courierName?: string;
+    trackingUrl?: string;
+    estimatedDelivery?: string;
+  }
+) {
+  const db = await getDb();
+  await updateDoc(doc(db, 'orders', docId), {
+    ...shippingData,
+    updatedAt: serverTimestamp(),
+  });
 }

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Mail, Phone, MapPin, Send, Clock, ArrowRight } from 'lucide-react';
+import { Mail, Phone, MapPin, Send, Clock, ArrowRight, MessageCircle } from 'lucide-react';
 import ScrollReveal from '@/components/shared/ScrollReveal';
 import Uploader from '@/components/shared/Uploader';
 import { sendEmail } from '@/lib/email';
@@ -23,6 +23,12 @@ const contactInfo = [
     label: 'Eshant',
     value: '+91 98670 46342',
     href: 'tel:+919867046342',
+  },
+  {
+    icon: <MessageCircle size={20} />,
+    label: 'WhatsApp',
+    value: 'Chat with us on WhatsApp',
+    href: 'https://wa.me/919867046342?text=Hi%20TREESUN%2C%20I%20have%20a%20query%20about%20your%20products.',
   },
   {
     icon: <MapPin size={20} />,

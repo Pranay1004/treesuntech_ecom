@@ -4,20 +4,24 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Package, Ticket, RefreshCw, ChevronDown, Search,
   CheckCircle2, Truck, Factory, XCircle, Clock,
+  ShoppingBag, Send, MessageCircle, ExternalLink,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import ScrollReveal from '@/components/shared/ScrollReveal';
+import ProductManager from '@/components/admin/ProductManager';
 import {
   getAllOrders,
   updateOrderStatus,
   getAllTickets,
   updateTicketStatus,
+  updateOrderShipping,
   type Order,
   type OrderStatus,
   type SupportTicket,
 } from '@/lib/firestore';
 import { sendOrderStatusEmail } from '@/lib/email';
+import { createShipment, trackShipment } from '@/lib/payments';
 
 const statusConfig: Record<OrderStatus, { label: string; color: string; icon: typeof Clock }> = {
   confirmed: { label: 'Confirmed', color: 'text-blue-400 bg-blue-500/10 border-blue-500/20', icon: Clock },
@@ -34,7 +38,8 @@ export default function AdminDashboard() {
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  const [activeTab, setActiveTab] = useState<'orders' | 'tickets'>('orders');
+  const [activeTab, setActiveTab] = useState<'orders' | 'tickets' | 'products'>('orders');
+  const [shippingId, setShippingId] = useState<string | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [loading, setLoading] = useState(true);
@@ -223,6 +228,16 @@ export default function AdminDashboard() {
               >
                 <Ticket size={14} /> Tickets ({stats.openTickets} open)
               </button>
+              <button
+                onClick={() => setActiveTab('products')}
+                className={`flex-1 py-2.5 text-sm font-medium rounded-lg transition-all inline-flex items-center justify-center gap-2 ${
+                  activeTab === 'products'
+                    ? 'bg-primary-500/20 text-primary-400 border border-primary-500/30'
+                    : 'text-slate-400 hover:text-white border border-transparent'
+                }`}
+              >
+                <ShoppingBag size={14} /> Products
+              </button>
             </div>
           </ScrollReveal>
 
@@ -367,6 +382,90 @@ export default function AdminDashboard() {
                                   </div>
                                 )}
 
+                                {/* Shiprocket Shipping */}
+                                {(order.status === 'confirmed' || order.status === 'production') && (
+                                  <div className="mb-4 pt-3 border-t border-white/5">
+                                    <button
+                                      onClick={async () => {
+                                        setShippingId(order.id!);
+                                        try {
+                                          const result = await createShipment({
+                                            orderId: order.orderId,
+                                            customerName: order.shippingAddress.fullName,
+                                            email: order.userEmail,
+                                            phone: order.shippingAddress.phone,
+                                            address: order.shippingAddress.line1,
+                                            city: order.shippingAddress.city,
+                                            state: order.shippingAddress.state,
+                                            pincode: order.shippingAddress.pincode,
+                                            items: order.items.map(i => ({
+                                              name: i.name,
+                                              productId: i.productId || i.name.toLowerCase().replace(/\s+/g, '-'),
+                                              quantity: i.quantity,
+                                              price: i.price,
+                                            })),
+                                            total: order.total,
+                                            paymentMethod: (order as any).paymentMethod || 'Prepaid',
+                                          });
+                                          if (result.shipment_id) {
+                                            await updateOrderShipping(order.id!, {
+                                              shipmentId: result.shipment_id.toString(),
+                                              awbCode: result.awb_code || '',
+                                              courierName: result.courier_name || '',
+                                              trackingUrl: result.awb_code ? `https://shiprocket.co/tracking/${result.awb_code}` : '',
+                                            });
+                                            toast(`Shipment created! AWB: ${result.awb_code || 'pending'}`, 'success');
+                                            fetchData();
+                                          }
+                                        } catch (err: any) {
+                                          toast(err.message || 'Failed to create shipment', 'error');
+                                        }
+                                        setShippingId(null);
+                                      }}
+                                      disabled={shippingId === order.id}
+                                      className="text-xs px-4 py-2 rounded-lg bg-purple-500/10 text-purple-400 border border-purple-500/20 hover:bg-purple-500/20 transition inline-flex items-center gap-2 disabled:opacity-50"
+                                    >
+                                      {shippingId === order.id ? (
+                                        <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                                      ) : (
+                                        <Send size={12} />
+                                      )}
+                                      Ship via Shiprocket
+                                    </button>
+                                  </div>
+                                )}
+
+                                {/* Shipping info if available */}
+                                {(order as any).shipmentId && (
+                                  <div className="mb-4 p-3 rounded-lg bg-purple-500/5 border border-purple-500/10">
+                                    <p className="text-slate-500 text-xs uppercase tracking-wider mb-2">Shipping Info</p>
+                                    <div className="text-sm text-slate-300 space-y-1">
+                                      {(order as any).shipmentId && <p>Shipment ID: <span className="font-mono text-purple-400">{(order as any).shipmentId}</span></p>}
+                                      {(order as any).awbCode && <p>AWB: <span className="font-mono text-purple-400">{(order as any).awbCode}</span></p>}
+                                      {(order as any).courier && <p>Courier: {(order as any).courier}</p>}
+                                      {(order as any).trackingUrl && (
+                                        <a href={(order as any).trackingUrl} target="_blank" rel="noopener noreferrer" className="text-primary-400 hover:text-primary-300 inline-flex items-center gap-1 text-xs mt-1">
+                                          <ExternalLink size={10} /> Track Shipment
+                                        </a>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* WhatsApp quick link */}
+                                <div className="mb-3">
+                                  <a
+                                    href={`https://wa.me/${order.shippingAddress.phone?.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(
+                                      `Hi ${order.shippingAddress.fullName}, this is regarding your TREESUN order ${order.orderId}. `
+                                    )}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-xs px-3 py-1.5 rounded-lg bg-green-500/10 text-green-400 border border-green-500/20 hover:bg-green-500/20 transition inline-flex items-center gap-1.5"
+                                  >
+                                    <MessageCircle size={12} /> WhatsApp Customer
+                                  </a>
+                                </div>
+
                                 {/* Actions - Bidirectional status change */}
                                 <div className="flex flex-wrap gap-2 pt-2 border-t border-white/5 items-center">
                                   <span className="text-slate-500 text-xs mr-1">Change status:</span>
@@ -459,6 +558,8 @@ export default function AdminDashboard() {
               )}
             </div>
           )}
+          {/* Products Tab */}
+          {activeTab === 'products' && <ProductManager />}
         </div>
       </div>
     </div>
